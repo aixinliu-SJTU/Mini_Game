@@ -1,0 +1,682 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>MPG Demo: From Harmonic Conflict to Potential Ascent</title>
+  <style>
+    :root{
+      --bg:#f6f6f8;
+      --panel:#ffffff;
+      --text:#111827;
+      --muted:#6b7280;
+      --border:#e5e7eb;
+      --red:#b91c1c;
+      --blue:#1d4ed8;
+      --green:#047857;
+      --shadow: 0 8px 24px rgba(0,0,0,0.08);
+    }
+    html,body{height:100%; margin:0; font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial;}
+    body{background:var(--bg); color:var(--text);}
+    .wrap{
+      display:grid;
+      grid-template-columns: 720px 1fr;
+      gap:16px;
+      padding:16px;
+      box-sizing:border-box;
+      height:100%;
+    }
+    .card{
+      background:var(--panel);
+      border:1px solid var(--border);
+      border-radius:14px;
+      box-shadow:var(--shadow);
+      overflow:hidden;
+    }
+    .header{
+      padding:12px 14px;
+      border-bottom:1px solid var(--border);
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:12px;
+    }
+    .header h1{
+      font-size:16px;
+      margin:0;
+      letter-spacing:0.2px;
+      font-weight:700;
+    }
+    .header .sub{
+      font-size:12px;
+      color:var(--muted);
+      margin-left:10px;
+      font-weight:500;
+    }
+    .content{padding:12px 14px;}
+    .grid{
+      display:grid;
+      grid-template-columns: 1fr 1fr;
+      gap:10px;
+    }
+    .row{
+      display:flex;
+      gap:10px;
+      align-items:center;
+      flex-wrap:wrap;
+    }
+    button{
+      border:1px solid var(--border);
+      background:#fff;
+      padding:8px 10px;
+      border-radius:10px;
+      cursor:pointer;
+      font-weight:600;
+      font-size:12px;
+    }
+    button.primary{
+      background:#111827;
+      color:#fff;
+      border-color:#111827;
+    }
+    button.danger{
+      background:var(--red);
+      color:#fff;
+      border-color:var(--red);
+    }
+    button:disabled{opacity:0.55; cursor:not-allowed;}
+    select, input[type="range"]{
+      width:100%;
+    }
+    .kv{
+      display:grid;
+      grid-template-columns: 120px 1fr;
+      gap:8px;
+      align-items:center;
+      font-size:12px;
+      margin:8px 0;
+    }
+    .kv .k{color:var(--muted);}
+    .mono{font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;}
+    .pill{
+      display:inline-flex;
+      align-items:center;
+      gap:8px;
+      border:1px solid var(--border);
+      border-radius:999px;
+      padding:6px 10px;
+      font-size:12px;
+      background:#fff;
+    }
+    .dot{
+      width:10px; height:10px; border-radius:999px; display:inline-block;
+      border:1px solid rgba(0,0,0,0.1);
+    }
+    .legend{display:flex; gap:10px; flex-wrap:wrap; margin-top:8px;}
+    .small{font-size:12px; color:var(--muted);}
+    .split{
+      display:grid;
+      grid-template-columns: 1fr;
+      gap:12px;
+    }
+    canvas{width:100%; height:160px; border:1px solid var(--border); border-radius:12px; background:#fff;}
+    #log{
+      height:180px;
+      overflow:auto;
+      border:1px solid var(--border);
+      border-radius:12px;
+      padding:10px;
+      background:#fff;
+      font-size:12px;
+      line-height:1.35;
+      white-space:pre-wrap;
+    }
+    .hint{
+      padding:10px 12px;
+      border-radius:12px;
+      border:1px dashed var(--border);
+      background:#fbfbfd;
+      font-size:12px;
+      color:var(--muted);
+    }
+    /* SVG */
+    #scene{
+      width:100%;
+      height:520px;
+      background:#fff;
+      border-top:1px solid var(--border);
+    }
+    .edge{stroke:#9ca3af; stroke-width:2;}
+    .edgeBlue{stroke: var(--blue); stroke-width:3; opacity:0.9;}
+    .edgeRed{stroke: var(--red); stroke-width:3; opacity:0.9;}
+    .arrow{fill: var(--red); opacity:0.9;}
+    .node{
+      stroke:#111827;
+      stroke-width:2;
+    }
+    .nodeLabel{
+      font-size:14px;
+      font-weight:800;
+      fill:#111827;
+      pointer-events:none;
+    }
+    .nodeStrategy{
+      font-size:14px;
+      font-weight:900;
+      fill:#ffffff;
+      pointer-events:none;
+    }
+    .groupHalo{
+      fill: rgba(29,78,216,0.06);
+      stroke: rgba(29,78,216,0.35);
+      stroke-width:2;
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <!-- Left: network -->
+    <div class="card">
+      <div class="header">
+        <div>
+          <h1>MPG Demo <span class="sub">6 players · 3 strategies · RPS conflict + potential structure</span></h1>
+        </div>
+        <div class="row">
+          <span class="pill"><span class="dot" style="background:var(--red)"></span> RPS (harmonic)</span>
+          <span class="pill"><span class="dot" style="background:var(--blue)"></span> pairing / coordination (potential)</span>
+        </div>
+      </div>
+
+      <svg id="scene" viewBox="0 0 720 520" xmlns="http://www.w3.org/2000/svg">
+        <defs>
+          <marker id="arrowHead" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+            <path d="M 0 0 L 10 5 L 0 10 z" class="arrow"></path>
+          </marker>
+        </defs>
+        <!-- group halos -->
+        <circle id="haloA" class="groupHalo" cx="230" cy="260" r="170" visibility="hidden"></circle>
+        <circle id="haloB" class="groupHalo" cx="490" cy="260" r="170" visibility="hidden"></circle>
+
+        <!-- edges (blue pairing) -->
+        <line class="edgeBlue" x1="170" y1="155" x2="430" y2="155"></line>
+        <line class="edgeBlue" x1="120" y1="345" x2="380" y2="345"></line>
+        <line class="edgeBlue" x1="300" y1="330" x2="560" y2="330"></line>
+
+        <!-- edges (intra undirected, shown light gray) -->
+        <!-- A triangle (1,2,3) -->
+        <line class="edge" x1="170" y1="155" x2="120" y2="345"></line>
+        <line class="edge" x1="120" y1="345" x2="300" y2="330"></line>
+        <line class="edge" x1="300" y1="330" x2="170" y2="155"></line>
+        <!-- B triangle (4,5,6) -->
+        <line class="edge" x1="430" y1="155" x2="380" y2="345"></line>
+        <line class="edge" x1="380" y1="345" x2="560" y2="330"></line>
+        <line class="edge" x1="560" y1="330" x2="430" y2="155"></line>
+
+        <!-- RPS directed edges (red) -->
+        <!-- A: 1->2->3->1 -->
+        <line class="edgeRed" x1="170" y1="155" x2="120" y2="345" marker-end="url(#arrowHead)"></line>
+        <line class="edgeRed" x1="120" y1="345" x2="300" y2="330" marker-end="url(#arrowHead)"></line>
+        <line class="edgeRed" x1="300" y1="330" x2="170" y2="155" marker-end="url(#arrowHead)"></line>
+        <!-- B: 4->5->6->4 -->
+        <line class="edgeRed" x1="430" y1="155" x2="380" y2="345" marker-end="url(#arrowHead)"></line>
+        <line class="edgeRed" x1="380" y1="345" x2="560" y2="330" marker-end="url(#arrowHead)"></line>
+        <line class="edgeRed" x1="560" y1="330" x2="430" y2="155" marker-end="url(#arrowHead)"></line>
+
+        <!-- nodes -->
+        <!-- A -->
+        <g id="node1" data-i="1"><circle class="node" cx="170" cy="155" r="28"></circle><text class="nodeLabel" x="170" y="120" text-anchor="middle">1</text><text class="nodeStrategy" x="170" y="161" text-anchor="middle"></text></g>
+        <g id="node2" data-i="2"><circle class="node" cx="120" cy="345" r="28"></circle><text class="nodeLabel" x="120" y="310" text-anchor="middle">2</text><text class="nodeStrategy" x="120" y="351" text-anchor="middle"></text></g>
+        <g id="node3" data-i="3"><circle class="node" cx="300" cy="330" r="28"></circle><text class="nodeLabel" x="300" y="295" text-anchor="middle">3</text><text class="nodeStrategy" x="300" y="336" text-anchor="middle"></text></g>
+        <!-- B -->
+        <g id="node4" data-i="4"><circle class="node" cx="430" cy="155" r="28"></circle><text class="nodeLabel" x="430" y="120" text-anchor="middle">4</text><text class="nodeStrategy" x="430" y="161" text-anchor="middle"></text></g>
+        <g id="node5" data-i="5"><circle class="node" cx="380" cy="345" r="28"></circle><text class="nodeLabel" x="380" y="310" text-anchor="middle">5</text><text class="nodeStrategy" x="380" y="351" text-anchor="middle"></text></g>
+        <g id="node6" data-i="6"><circle class="node" cx="560" cy="330" r="28"></circle><text class="nodeLabel" x="560" y="295" text-anchor="middle">6</text><text class="nodeStrategy" x="560" y="336" text-anchor="middle"></text></g>
+      </svg>
+
+      <div class="content">
+        <div class="hint">
+          Tip: Click a node to cycle its strategy (R→P→S). Use <b>Preset Init</b> to start from a visibly oscillatory configuration, then compare <b>Individual BR</b> vs <b>Group BR (Potential Ascent)</b>.
+        </div>
+      </div>
+    </div>
+
+    <!-- Right: controls -->
+    <div class="card">
+      <div class="header">
+        <h1>Controls & Metrics</h1>
+        <div class="row">
+          <button id="btnPreset" class="primary">Preset Init</button>
+          <button id="btnRandom">Random Init</button>
+          <button id="btnResetHist">Reset Plot</button>
+        </div>
+      </div>
+
+      <div class="content split">
+        <div class="grid">
+          <div class="card" style="box-shadow:none;">
+            <div class="content">
+              <div class="kv"><div class="k">Mode</div>
+                <div>
+                  <select id="mode">
+                    <option value="individual">Individual BR (ungrouped)</option>
+                    <option value="group">Group BR (grouped, potential ascent)</option>
+                  </select>
+                </div>
+              </div>
+
+              <div class="kv"><div class="k">γ (RPS strength)</div>
+                <div><input id="gamma" type="range" min="0" max="5" step="0.1" value="2.0"></div>
+              </div>
+              <div class="kv"><div class="k">η (intra cohesion)</div>
+                <div><input id="eta" type="range" min="0" max="5" step="0.1" value="1.0"></div>
+              </div>
+              <div class="kv"><div class="k">λ (pair coordination)</div>
+                <div><input id="lambda" type="range" min="0" max="5" step="0.1" value="1.0"></div>
+              </div>
+
+              <div class="kv"><div class="k">Speed</div>
+                <div><input id="speed" type="range" min="1" max="60" step="1" value="12"></div>
+              </div>
+
+              <div class="row" style="margin-top:10px;">
+                <button id="btnStep">Step</button>
+                <button id="btnRun" class="primary">Run</button>
+                <button id="btnStop" class="danger" disabled>Stop</button>
+                <button id="btnGroups">Show Groups</button>
+              </div>
+
+              <div class="legend">
+                <span class="pill"><span class="dot" style="background:#ef4444"></span> R</span>
+                <span class="pill"><span class="dot" style="background:#3b82f6"></span> P</span>
+                <span class="pill"><span class="dot" style="background:#10b981"></span> S</span>
+              </div>
+
+              <div style="margin-top:10px;" class="small">
+                Potential plotted: <span class="mono">Φ(s)= λ·(#matched pairs) + η·(#matched intra edges)</span>
+              </div>
+
+              <div class="kv"><div class="k">State</div><div class="mono" id="stateTxt"></div></div>
+              <div class="kv"><div class="k">Φ(s)</div><div class="mono" id="phiTxt"></div></div>
+              <div class="kv"><div class="k">Avg utility</div><div class="mono" id="avgUTxt"></div></div>
+            </div>
+          </div>
+
+          <div class="card" style="box-shadow:none;">
+            <div class="content">
+              <div style="font-weight:800; font-size:12px; margin-bottom:8px;">Potential trajectory Φ(s)</div>
+              <canvas id="plot" width="520" height="180"></canvas>
+              <div style="font-weight:800; font-size:12px; margin:12px 0 8px;">Log</div>
+              <div id="log" class="mono"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+<script>
+(() => {
+  // ---------- Game definition ----------
+  const STRATS = ["R","P","S"];
+  const colorOf = (s) => (s==="R" ? "#ef4444" : s==="P" ? "#3b82f6" : "#10b981");
+
+  // Pair edges: (1,4), (2,5), (3,6)
+  const pairOf = {1:4,2:5,3:6,4:1,5:2,6:3};
+
+  // Intra edges (undirected) within each group (triangles)
+  const intraEdges = [
+    [1,2],[2,3],[3,1],
+    [4,5],[5,6],[6,4],
+  ];
+
+  // RPS directed successor edges within each group
+  const succ = {1:2,2:3,3:1,4:5,5:6,6:4};
+
+  // RPS payoff g(a,b)
+  function g(a,b){
+    if (a===b) return 0;
+    if ((a==="R" && b==="S") || (a==="S" && b==="P") || (a==="P" && b==="R")) return 1;
+    return -1;
+  }
+
+  // Parameters (bound to UI)
+  const params = {gamma:2.0, eta:1.0, lambda:1.0};
+
+  // State: strategies s[1..6]
+  let s = {1:"R",2:"P",3:"S",4:"S",5:"R",6:"P"};
+
+  // History for plot
+  let phiHist = [];
+  let stepCount = 0;
+
+  // ---------- Utility & potential ----------
+  function u(i, state=s){
+    const si = state[i];
+    // Pair coordination (potential part)
+    const upair = params.lambda * (si === state[pairOf[i]] ? 1 : 0);
+
+    // Intra cohesion (potential part): count matches with the other two in group
+    const group = (i<=3) ? [1,2,3] : [4,5,6];
+    let uintra = 0;
+    for (const j of group){
+      if (j===i) continue;
+      if (si === state[j]) uintra += params.eta;
+    }
+
+    // RPS directed (harmonic-like conflict)
+    const urps = params.gamma * g(si, state[succ[i]]);
+
+    return upair + uintra + urps;
+  }
+
+  // Potential Φ(s): only potential part (pair + intra edges counted once)
+  function Phi(state=s){
+    let val = 0;
+
+    // pair edges count once: (1,4),(2,5),(3,6)
+    val += params.lambda * (state[1]===state[4] ? 1 : 0);
+    val += params.lambda * (state[2]===state[5] ? 1 : 0);
+    val += params.lambda * (state[3]===state[6] ? 1 : 0);
+
+    // intra edges count once
+    for (const [a,b] of intraEdges){
+      if (state[a]===state[b]) val += params.eta;
+    }
+    return val;
+  }
+
+  // Group potential contribution P_a (what a group maximizes in "associated MPG" view)
+  // Group A: {1,2,3} -> its intra edges + its pair edges to B
+  // Group B: {4,5,6} -> its intra edges + its pair edges to A
+  function groupPotentialContribution(groupId, state=s){
+    let val = 0;
+    if (groupId==="A"){
+      // intra within A
+      for (const [a,b] of [[1,2],[2,3],[3,1]]) if (state[a]===state[b]) val += params.eta;
+      // pair edges touching A
+      val += params.lambda * (state[1]===state[4] ? 1 : 0);
+      val += params.lambda * (state[2]===state[5] ? 1 : 0);
+      val += params.lambda * (state[3]===state[6] ? 1 : 0);
+    } else {
+      // intra within B
+      for (const [a,b] of [[4,5],[5,6],[6,4]]) if (state[a]===state[b]) val += params.eta;
+      // pair edges touching B (same as above, counted from B side)
+      val += params.lambda * (state[1]===state[4] ? 1 : 0);
+      val += params.lambda * (state[2]===state[5] ? 1 : 0);
+      val += params.lambda * (state[3]===state[6] ? 1 : 0);
+    }
+    return val;
+  }
+
+  function avgUtility(state=s){
+    let sum = 0;
+    for (let i=1;i<=6;i++) sum += u(i,state);
+    return sum/6;
+  }
+
+  // ---------- Dynamics ----------
+  function individualBRStep(){
+    const i = 1 + Math.floor(Math.random()*6);
+    const current = s[i];
+    let best = -Infinity, bestActs = [];
+    for (const a of STRATS){
+      const cand = {...s, [i]:a};
+      const val = u(i,cand);
+      if (val > best + 1e-9){
+        best = val; bestActs = [a];
+      } else if (Math.abs(val-best)<=1e-9){
+        bestActs.push(a);
+      }
+    }
+    const pick = bestActs[Math.floor(Math.random()*bestActs.length)];
+    s[i] = pick;
+
+    stepCount++;
+    pushHistory(`Individual BR: player ${i} = ${current} → ${pick}`);
+  }
+
+  // Group BR step (grouped): choose a group and update the 3 players jointly
+  // Objective: maximize groupPotentialContribution (potential ascent)
+  function groupBRStep(){
+    const groupId = (Math.random()<0.5) ? "A" : "B";
+    const group = (groupId==="A") ? [1,2,3] : [4,5,6];
+
+    const old = group.map(i => s[i]).join("");
+    let best = -Infinity;
+    let bestProfiles = [];
+
+    // enumerate 3^3 = 27 profiles
+    for (const a1 of STRATS){
+      for (const a2 of STRATS){
+        for (const a3 of STRATS){
+          const cand = {...s};
+          cand[group[0]] = a1;
+          cand[group[1]] = a2;
+          cand[group[2]] = a3;
+
+          const val = groupPotentialContribution(groupId, cand);
+          if (val > best + 1e-9){
+            best = val; bestProfiles = [[a1,a2,a3]];
+          } else if (Math.abs(val-best)<=1e-9){
+            bestProfiles.push([a1,a2,a3]);
+          }
+        }
+      }
+    }
+
+    const chosen = bestProfiles[Math.floor(Math.random()*bestProfiles.length)];
+    s[group[0]] = chosen[0];
+    s[group[1]] = chosen[1];
+    s[group[2]] = chosen[2];
+
+    const now = group.map(i => s[i]).join("");
+    stepCount++;
+    pushHistory(`Group BR (Potential): group ${groupId} = ${old} → ${now}`);
+  }
+
+  function stepOnce(){
+    const mode = document.getElementById("mode").value;
+    if (mode==="individual") individualBRStep();
+    else groupBRStep();
+    renderAll();
+  }
+
+  // ---------- UI + rendering ----------
+  const logEl = document.getElementById("log");
+  function pushHistory(msg){
+    const phi = Phi(s).toFixed(2);
+    const au = avgUtility(s).toFixed(2);
+    const st = stateString(s);
+    logEl.textContent = `[t=${stepCount}] ${msg}\n  state=${st}\n  Φ=${phi}, avgU=${au}\n` + logEl.textContent;
+    phiHist.push(Phi(s));
+    if (phiHist.length > 300) phiHist.shift();
+  }
+
+  function stateString(state=s){
+    let arr = [];
+    for (let i=1;i<=6;i++) arr.push(state[i]);
+    return arr.join("");
+  }
+
+  function renderNodes(){
+    for (let i=1;i<=6;i++){
+      const gEl = document.getElementById("node"+i);
+      const circle = gEl.querySelector("circle");
+      const st = gEl.querySelector(".nodeStrategy");
+      circle.setAttribute("fill", colorOf(s[i]));
+      st.textContent = s[i];
+    }
+  }
+
+  function renderMetrics(){
+    document.getElementById("stateTxt").textContent = stateString(s);
+    document.getElementById("phiTxt").textContent = Phi(s).toFixed(2);
+    document.getElementById("avgUTxt").textContent = avgUtility(s).toFixed(2);
+  }
+
+  // Simple plot of phiHist
+  const plot = document.getElementById("plot");
+  const ctx = plot.getContext("2d");
+
+  function drawPlot(){
+    const w = plot.width, h = plot.height;
+    ctx.clearRect(0,0,w,h);
+
+    // frame
+    ctx.strokeStyle = "#e5e7eb";
+    ctx.lineWidth = 1;
+    ctx.strokeRect(0.5,0.5,w-1,h-1);
+
+    if (phiHist.length < 2) return;
+
+    // compute min/max with padding
+    let mn = Math.min(...phiHist), mx = Math.max(...phiHist);
+    if (Math.abs(mx-mn) < 1e-6) { mx = mn+1; }
+    const pad = 0.08*(mx-mn);
+    mn -= pad; mx += pad;
+
+    const xScale = (i) => (i/(phiHist.length-1))*(w-20) + 10;
+    const yScale = (v) => h - ( (v-mn)/(mx-mn) )*(h-20) - 10;
+
+    // gridlines (light)
+    ctx.strokeStyle = "#f3f4f6";
+    for (let k=1;k<=3;k++){
+      const y = 10 + k*(h-20)/4;
+      ctx.beginPath(); ctx.moveTo(10,y); ctx.lineTo(w-10,y); ctx.stroke();
+    }
+
+    // line
+    ctx.strokeStyle = "#111827";
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(xScale(0), yScale(phiHist[0]));
+    for (let i=1;i<phiHist.length;i++){
+      ctx.lineTo(xScale(i), yScale(phiHist[i]));
+    }
+    ctx.stroke();
+
+    // last point
+    const lx = xScale(phiHist.length-1), ly = yScale(phiHist[phiHist.length-1]);
+    ctx.fillStyle = "#111827";
+    ctx.beginPath(); ctx.arc(lx,ly,3,0,Math.PI*2); ctx.fill();
+
+    // labels
+    ctx.fillStyle = "#6b7280";
+    ctx.font = "12px ui-monospace, Menlo, monospace";
+    ctx.fillText(`min ${mn.toFixed(1)}`, 12, h-6);
+    ctx.fillText(`max ${mx.toFixed(1)}`, 12, 14);
+    ctx.fillText(`t=${stepCount}`, w-90, 14);
+  }
+
+  function renderAll(){
+    renderNodes();
+    renderMetrics();
+    drawPlot();
+  }
+
+  // click nodes to cycle strategy
+  for (let i=1;i<=6;i++){
+    const gEl = document.getElementById("node"+i);
+    gEl.style.cursor = "pointer";
+    gEl.addEventListener("click", () => {
+      const idx = STRATS.indexOf(s[i]);
+      s[i] = STRATS[(idx+1)%3];
+      stepCount++;
+      pushHistory(`Manual: player ${i} → ${s[i]}`);
+      renderAll();
+    });
+  }
+
+  // groups toggle
+  let groupsShown = false;
+  document.getElementById("btnGroups").addEventListener("click", () => {
+    groupsShown = !groupsShown;
+    document.getElementById("haloA").setAttribute("visibility", groupsShown ? "visible" : "hidden");
+    document.getElementById("haloB").setAttribute("visibility", groupsShown ? "visible" : "hidden");
+  });
+
+  // init presets
+  function presetInit(){
+    // A: R P S, B: S R P (often oscillatory under individual BR when gamma is moderate)
+    s = {1:"R",2:"P",3:"S",4:"S",5:"R",6:"P"};
+    phiHist = [];
+    stepCount = 0;
+    logEl.textContent = "";
+    pushHistory("Preset Init");
+    renderAll();
+  }
+  function randomInit(){
+    const pick = () => STRATS[Math.floor(Math.random()*3)];
+    s = {1:pick(),2:pick(),3:pick(),4:pick(),5:pick(),6:pick()};
+    phiHist = [];
+    stepCount = 0;
+    logEl.textContent = "";
+    pushHistory("Random Init");
+    renderAll();
+  }
+
+  document.getElementById("btnPreset").addEventListener("click", presetInit);
+  document.getElementById("btnRandom").addEventListener("click", randomInit);
+  document.getElementById("btnResetHist").addEventListener("click", () => {
+    phiHist = [Phi(s)];
+    drawPlot();
+  });
+
+  // params bindings
+  function bindSlider(id, key){
+    const el = document.getElementById(id);
+    const update = () => {
+      params[key] = parseFloat(el.value);
+      renderAll();
+    };
+    el.addEventListener("input", update);
+    update();
+  }
+  bindSlider("gamma","gamma");
+  bindSlider("eta","eta");
+  bindSlider("lambda","lambda");
+
+  // step/run
+  document.getElementById("btnStep").addEventListener("click", () => stepOnce());
+
+  let timer = null;
+  function run(){
+    if (timer) return;
+    document.getElementById("btnRun").disabled = true;
+    document.getElementById("btnStop").disabled = false;
+
+    timer = setInterval(() => {
+      stepOnce();
+    }, Math.floor(1000 / parseInt(document.getElementById("speed").value,10)));
+  }
+  function stop(){
+    if (!timer) return;
+    clearInterval(timer);
+    timer = null;
+    document.getElementById("btnRun").disabled = false;
+    document.getElementById("btnStop").disabled = true;
+  }
+  document.getElementById("btnRun").addEventListener("click", run);
+  document.getElementById("btnStop").addEventListener("click", stop);
+
+  // speed update affects timer
+  document.getElementById("speed").addEventListener("input", () => {
+    if (timer){
+      stop();
+      run();
+    }
+  });
+
+  // mode change: reset plot (optional)
+  document.getElementById("mode").addEventListener("change", () => {
+    pushHistory(`Mode → ${document.getElementById("mode").value}`);
+    renderAll();
+  });
+
+  // start
+  presetInit();
+})();
+</script>
+</body>
+</html>
